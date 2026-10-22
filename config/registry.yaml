@@ -1,0 +1,71 @@
+version: "1.0"
+servers:
+  # BACKEND 1: CLI Wrapper (GitHub) -> Solves P1 (No agent setup) and P5 (Unified CLI)
+  github:
+    type: cli_wrapper
+    command: "gh"
+    description: "GitHub repository operations (Issues and Pull Requests)."
+    tools:
+      list_prs:
+        risk: read
+        description: "List open PRs for the configured repository with author and state."
+        args:
+          limit: { type: integer, default: 5, description: "Maximum number of PRs to return" }
+      get_pr:
+        risk: read
+        description: "Get details and summary diff of a specific pull request."
+        args:
+          pr_number: { type: integer, required: true, description: "Pull request number to inspect" }
+      create_issue:
+        risk: write
+        description: "Create a new issue in the GitHub repository with title and detailed body."
+        args:
+          title: { type: string, required: true, description: "Title of the issue" }
+          body: { type: string, required: true, description: "Detailed description of the issue" }
+
+  # BACKEND 2: MCP Upstream Proxy (SQLite simulating Jira) -> Solves P2 (AuthZ/Risk) and P5
+  jira_mock:
+    type: mcp_proxy
+    transport: stdio
+    command: "python"
+    args: ["scripts/sqlite_mcp_server.py"]
+    description: "Internal engineering bug and ticket tracking system (Jira simulated with SQLite)."
+    tools:
+      read_query:
+        risk: read
+        description: "Execute a SELECT SQL query on the tickets table (columns: id, title, description, status, priority, assigned_to, call_id)."
+        args:
+          query: { type: string, required: true, description: "SELECT SQL query to execute" }
+      write_query:
+        risk: write
+        description: "Insert or update a ticket in the database (INSERT or UPDATE)."
+        args:
+          query: { type: string, required: true, description: "SQL mutation statement to execute" }
+
+  # BACKEND 3: Declarative HTTP Mapping (Telephony UV API) -> Solves P4 (Redaction), P6 (Existing APIs as tools), P7 (Projection)
+  telephony_api:
+    type: http_mapping
+    base_url: "http://127.0.0.1:8001"
+    description: "Internal Dialpad telephony and customer data API (UV/FST)."
+    tools:
+      get_call:
+        risk: read
+        method: GET
+        path: "/api/calls/{call_id}"
+        description: "Get call details by call_id: direction, duration, error_code, contact PII, and transcript."
+        redact:
+          - "phone_number"
+          - "customer_email"
+          - "transcript_snippet"
+        args:
+          call_id: { type: string, required: true, description: "Unique call ID (e.g., c-901)" }
+      get_customer:
+        risk: read
+        method: GET
+        path: "/api/customers/{customer_id}"
+        description: "Get corporate customer profile by customer_id."
+        redact:
+          - "ssn"
+          - "phone"
+        args:
+          customer_id: { type: string, required: true, description: "Unique customer ID (e.g., cust-501)" }

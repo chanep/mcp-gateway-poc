@@ -1,0 +1,32 @@
+[project]
+name = "mcp-gateway-poc"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Esteban Canepa", email = "estebancanepa@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.160.0",
+    "httpx>=0.28.1",
+    "langchain>=1.4.7",
+    "langchain-core>=1.7.0",
+    "langchain-google-genai>=4.4.2",
+    "langchain-mcp-adapters>=0.3.2",
+    "langchain-openai>=1.7.2",
+    "langgraph>=1.2.16",
+    "mcp>=1.2.0,<2",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "thefuzz>=0.22.1",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+mcp-gateway-poc = "mcp_gateway_poc:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
