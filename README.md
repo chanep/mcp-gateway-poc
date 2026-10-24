@@ -55,15 +55,29 @@ uv run python tests/test_e2e_incident_flow.py
 ```
 
 ### 4. Modo Interactivo (Chat con el Agente)
-Primero levanta el Gateway en una terminal:
+Para probar el flujo completo con servicios reales desacoplados:
+
+1. **Terminal 1 - Levantar la API REST de Telefonía (Puerto 8001):**
 ```bash
-uv run uvicorn gateway.server:app --port 8000 --reload
+uv run uvicorn mock_telephony.main:app --port 8001 --reload
 ```
-Y en otra terminal inicia la consola interactiva donde puedes chatear y autorizar (`[y/N]`) las mutaciones en vivo:
+
+2. **Terminal 2 - Levantar el MCP Gateway (Puerto 8000):**
+```bash
+uv run uvicorn gateway.server:app --port 8000 --reload --no-access-log
+```
+
+3. **Terminal 3 - Iniciar el Agente CLI:**
 ```bash
 uv run python agent/cli.py
 ```
 *Tip: Escribe `demo` para correr la consulta del incidente de llamadas o escribe tus propias preguntas.*
+
+> **💡 Tip de Troubleshooting (Puerto en uso en Windows con `--reload`):**
+> Si al reiniciar Uvicorn indica que el puerto `8000` u `8001` ya está en uso por un worker huérfano anterior, puedes liberarlo rápidamente en PowerShell con:
+> ```powershell
+> Stop-Process -Id (Get-NetTCPConnection -LocalPort 8001).OwningProcess -Force
+> ```
 
 ### 5. Inspeccionar Métricas y Catálogo
 Con el servidor corriendo, puedes abrir en tu navegador o hacer `curl`:
@@ -73,18 +87,16 @@ Con el servidor corriendo, puedes abrir en tu navegador o hacer `curl`:
 
 ---
 
-## ⚙️ Configuración Opcional de LLM Real
+## ⚙️ Configuración del LLM Real
 
-Por defecto, si no configuras una API key, el agente corre con un **Planner Determinístico Educativo** que simula los pasos del LLM sin costo.
-
-Para conectar un LLM real (Gemini u OpenAI), crea un archivo `.env`:
+Configura tu API key de Google Gemini (o OpenAI) en tu archivo `.env`:
 ```ini
 # Google Gemini
-GEMINI_API_KEY="tu-api-key-de-gemini"
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_API_KEY="AIzaSy..."
+GEMINI_MODEL="gemini-3.5-flash-lite"
 
-# O OpenAI
-# OPENAI_API_KEY="tu-api-key-de-openai"
+# Opcional: OpenAI
+# OPENAI_API_KEY="sk-..."
 # OPENAI_MODEL="gpt-4o-mini"
 ```
 

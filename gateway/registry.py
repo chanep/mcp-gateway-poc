@@ -1,3 +1,5 @@
+import asyncio
+import concurrent.futures
 import yaml
 from pathlib import Path
 from typing import Dict
@@ -20,7 +22,6 @@ class RegistryManager:
         with open(self.config_path, "r", encoding="utf-8") as f:
             raw_data = yaml.safe_load(f)
 
-        # Inject server and tool names into each ToolDefinition for traceability
         servers = {}
         for s_name, s_data in raw_data.get("servers", {}).items():
             tools = {}
@@ -46,7 +47,29 @@ class RegistryManager:
                 raise ValueError(f"Unsupported server type: {s_def.type}")
         return adapters
 
+    async def initialize(self):
+        """Asynchronously discovers and registers dynamic tools from upstream MCP servers."""
+        for s_name, adapter in self.adapters.items():
+            if isinstance(adapter, McpAdapter):
+                dynamic_tools = await adapter.discover_tools()
+                self.config.servers[s_name].tools.update(dynamic_tools)
+
+    def ensure_tools_loaded(self):
+        """Synchronous guard to ensure dynamic tools are discovered if not yet populated."""
+        for s_name, s_def in self.config.servers.items():
+            if s_def.type == "mcp_proxy" and not s_def.tools:
+                adapter = self.adapters.get(s_name)
+                if isinstance(adapter, McpAdapter):
+                    try:
+                        loop = asyncio.get_running_loop()
+                        with concurrent.futures.ThreadPoolExecutor() as pool:
+                            dynamic_tools = pool.submit(asyncio.run, adapter.discover_tools()).result()
+                    except RuntimeError:
+                        dynamic_tools = asyncio.run(adapter.discover_tools())
+                    s_def.tools.update(dynamic_tools)
+
     def get_tool(self, server_name: str, tool_name: str) -> ToolDefinition:
+        self.ensure_tools_loaded()
         server = self.config.servers.get(server_name)
         if not server:
             raise KeyError(f"Server '{server_name}' does not exist in registry.")

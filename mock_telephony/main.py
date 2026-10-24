@@ -1,9 +1,24 @@
+import sys
+from pathlib import Path
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from typing import Dict, Any
 
+# Ensure project root is in sys.path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logging.getLogger("uvicorn.access").disabled = True
+    yield
+
 app = FastAPI(
     title="Mock Telephony & UV API",
-    description="Microservice simulating Dialpad's internal telephony API with call and customer records containing PII."
+    description="Microservice simulating Dialpad's internal telephony API with call and customer records containing PII.",
+    lifespan=lifespan
 )
 
 CALLS_DB: Dict[str, Dict[str, Any]] = {
@@ -80,3 +95,7 @@ def get_customer(customer_id: str):
     if not customer:
         raise HTTPException(status_code=404, detail=f"Customer with ID '{customer_id}' not found.")
     return customer
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8001)

@@ -56,19 +56,12 @@ class HttpAdapter(BaseAdapter):
                     }
                 return resp.json()
         except httpx.ConnectError:
-            # In-memory fallback if the mock service on 8001 is not running in another terminal
-            try:
-                from mock_telephony.main import CALLS_DB, CUSTOMERS_DB
-                if "call_id" in args:
-                    call = CALLS_DB.get(args["call_id"])
-                    if call:
-                        return call
-                    return {"error": "HTTP 404", "detail": f"Call {args['call_id']} not found"}
-                if "customer_id" in args:
-                    cust = CUSTOMERS_DB.get(args["customer_id"])
-                    if cust:
-                        return cust
-                    return {"error": "HTTP 404", "detail": f"Customer {args['customer_id']} not found"}
-            except Exception:
-                pass
-            return {"error": "CONNECTION_REFUSED", "detail": f"Could not connect to {full_url}"}
+            return {
+                "error": "CONNECTION_REFUSED",
+                "detail": f"Could not connect to {full_url}. Ensure the upstream REST service is running."
+            }
+        except httpx.TimeoutException:
+            return {
+                "error": "TIMEOUT",
+                "detail": f"Request to {full_url} timed out after 5 seconds."
+            }

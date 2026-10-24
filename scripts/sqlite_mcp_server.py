@@ -1,14 +1,18 @@
 import sqlite3
 import json
 import os
+import logging
 from mcp.server.fastmcp import FastMCP
+
+logging.getLogger("mcp").disabled = True
+logging.getLogger("mcp.server.lowlevel.server").disabled = True
 
 DB_PATH = os.getenv("SQLITE_DB_PATH", "./data/tickets.db")
 mcp = FastMCP("sqlite-jira-mock")
 
 @mcp.tool()
 def read_query(query: str) -> str:
-    """Execute a SELECT SQL query on the engineering tickets database."""
+    """Execute a SELECT SQL query on the engineering tickets database (columns: id, title, description, status, priority, assigned_to, call_id)."""
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row

@@ -1,9 +1,27 @@
 import json
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Annotated
+from pydantic import Field
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from gateway.catalog import CatalogService
+
+class QuietNoiseFilter(logging.Filter):
+    """Suppresses raw HTTP 202/200 SSE access logs and internal MCP protocol messages."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if "/catalog/messages" in msg or "/catalog/sse" in msg:
+            return False
+        if "Processing request of type" in msg or "Dispatching request of type" in msg:
+            return False
+        return True
+
+# Apply at import time
+_noise_filter = QuietNoiseFilter()
+for _name in ("uvicorn.access", "mcp", "mcp.server.lowlevel.server"):
+    logging.getLogger(_name).addFilter(_noise_filter)
 
 # 1. Instantiate MCP Server with domain boundary instructions
 mcp_server = FastMCP(
@@ -40,10 +58,20 @@ def get_tool_schema(server: str, tool: str) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp_server.tool()
-async def invoke_read(server: str, tool: str, arguments: Optional[Dict[str, Any]] = None, fields: Optional[List[str]] = None) -> str:
+async def invoke_read(
+    server: Annotated[str, Field(description="Name of the backend server")],
+    tool: Annotated[str, Field(description="Name of the tool on that server")],
+    arguments: Annotated[Optional[Dict[str, Any]], Field(default=None, description="Input parameters dictionary to pass to the upstream tool")] = None,
+    fields: Annotated[Optional[List[str]], Field(default=None, description="Response Projection: optional list of specific property names to return from the response payload (e.g. ['id', 'status']). When specific attributes are needed, provide them to filter the response at the Gateway boundary and minimize token usage.")] = None
+) -> str:
     """
     Execute a READ-ONLY tool (risk: read).
     Automatically applies PII Redaction (P4) and Response Projection (P7).
+
+    Response Projection (Context Optimization):
+    - When your task or query requires only specific attributes from the upstream record, pass those key names in `fields` (e.g. fields=['id', 'status']).
+    - The Gateway filters out unrequested keys, returning a minimal payload.
+    - Omit or pass None only if you genuinely require the entire record.
     """
     result = await catalog.execute_tool(
         invoked_risk="read",
@@ -85,10 +113,23 @@ async def invoke_destructive(server: str, tool: str, arguments: Optional[Dict[st
     )
     return json.dumps(result, ensure_ascii=False)
 
-# 3. FastAPI App with Observability endpoints and mounted MCP SSE sub-app
+# 3. Lifespan to suppress noisy HTTP access logs & discover dynamic MCP tools
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure filter is active even after Uvicorn initializes handlers
+    for name in ("uvicorn.access", "mcp", "mcp.server.lowlevel.server"):
+        l = logging.getLogger(name)
+        l.addFilter(_noise_filter)
+        l.setLevel(logging.WARNING)
+    # Dynamically discover tools from upstream MCP servers (P5/P6 dynamic forwarding)
+    await catalog.initialize()
+    yield
+
+# 4. FastAPI App with Observability endpoints and mounted MCP SSE sub-app
 app = FastAPI(
     title="Dialpad MCP Gateway",
-    description="Centralized tool gateway for AI coding agents (inspired by Uber)."
+    description="Centralized tool gateway for AI coding agents (inspired by Uber).",
+    lifespan=lifespan
 )
 
 @app.get("/health")

@@ -8,8 +8,13 @@ def apply_response_projection(data: Any, fields: Optional[List[str]]) -> Any:
     if not fields or data is None:
         return data
 
+    clean_fields = {f.strip().lower() for f in fields if isinstance(f, str)}
+    if not clean_fields:
+        return data
+
     if isinstance(data, dict):
-        return {k: v for k, v in data.items() if k in fields}
+        projected = {k: v for k, v in data.items() if k.lower() in clean_fields}
+        return projected if projected else data
 
     if isinstance(data, list):
         return [

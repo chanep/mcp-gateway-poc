@@ -23,24 +23,16 @@ servers:
           title: { type: string, required: true, description: "Title of the issue" }
           body: { type: string, required: true, description: "Detailed description of the issue" }
 
-  # BACKEND 2: MCP Upstream Proxy (SQLite simulating Jira) -> Solves P2 (AuthZ/Risk) and P5
+  # BACKEND 2: MCP Upstream Proxy (SQLite simulating Jira) -> Dynamic MCP Tool Forwarding
   jira_mock:
     type: mcp_proxy
     transport: stdio
     command: "python"
     args: ["scripts/sqlite_mcp_server.py"]
     description: "Internal engineering bug and ticket tracking system (Jira simulated with SQLite)."
-    tools:
-      read_query:
-        risk: read
-        description: "Execute a SELECT SQL query on the tickets table (columns: id, title, description, status, priority, assigned_to, call_id)."
-        args:
-          query: { type: string, required: true, description: "SELECT SQL query to execute" }
-      write_query:
-        risk: write
-        description: "Insert or update a ticket in the database (INSERT or UPDATE)."
-        args:
-          query: { type: string, required: true, description: "SQL mutation statement to execute" }
+    default_risk: read
+    risk_overrides:
+      write_query: write
 
   # BACKEND 3: Declarative HTTP Mapping (Telephony UV API) -> Solves P4 (Redaction), P6 (Existing APIs as tools), P7 (Projection)
   telephony_api:
