@@ -14,7 +14,7 @@ from agent.graph import build_gateway_agent
 
 async def main():
     print("=" * 70)
-    print("DIALPAD MCP GATEWAY - INTERACTIVE LANGGRAPH AGENT (ReAct + HITL)")
+    print("PHONECENTRAL MCP GATEWAY - INTERACTIVE LANGGRAPH AGENT (ReAct + HITL)")
     print("=" * 70)
     print("Agent connects to Gateway via SSE and discovers tools dynamically.")
     print("Mutating/destructive actions require your explicit confirmation.\n")

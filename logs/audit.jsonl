@@ -22,3 +22,8 @@
 {"timestamp": "2026-10-24T15:58:06.802989+00:00", "agent_id": "langgraph-agent", "server": "telephony_api", "tool": "get_call", "risk": "read", "duration_ms": 8.93, "status": "SUCCESS", "bytes_out": 25, "error": null}
 {"timestamp": "2026-10-24T15:58:28.853312+00:00", "agent_id": "langgraph-agent", "server": "jira_mock", "tool": "read_query", "risk": "read", "duration_ms": 539.92, "status": "SUCCESS", "bytes_out": 22, "error": null}
 {"timestamp": "2026-10-24T15:58:29.913096+00:00", "agent_id": "langgraph-agent", "server": "telephony_api", "tool": "get_call", "risk": "read", "duration_ms": 11.6, "status": "SUCCESS", "bytes_out": 388, "error": null}
+{"timestamp": "2026-10-25T12:38:13.378765+00:00", "agent_id": "langgraph-agent", "server": "jira_mock", "tool": "read_query", "risk": "read", "duration_ms": 552.77, "status": "SUCCESS", "bytes_out": 349, "error": null}
+{"timestamp": "2026-10-25T12:38:14.161026+00:00", "agent_id": "langgraph-agent", "server": "telephony_api", "tool": "get_call", "risk": "read", "duration_ms": 43.62, "status": "SUCCESS", "bytes_out": 412, "error": null}
+{"timestamp": "2026-10-25T12:38:25.341755+00:00", "agent_id": "langgraph-agent", "server": "github", "tool": "create_issue", "risk": "write", "duration_ms": 0.11, "status": "SUCCESS", "bytes_out": 210, "error": null}
+{"timestamp": "2026-10-25T12:56:54.085516+00:00", "agent_id": "langgraph-agent", "server": "jira_mock", "tool": "read_query", "risk": "read", "duration_ms": 531.89, "status": "SUCCESS", "bytes_out": 267, "error": null}
+{"timestamp": "2026-10-25T12:56:55.033946+00:00", "agent_id": "langgraph-agent", "server": "telephony_api", "tool": "get_call", "risk": "read", "duration_ms": 8.68, "status": "SUCCESS", "bytes_out": 393, "error": null}

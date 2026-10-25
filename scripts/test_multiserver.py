@@ -19,7 +19,7 @@ async def test_multiserver():
 
     try:
         client = MultiServerMCPClient({
-            "dialpad_gateway": {
+            "phonecentral_gateway": {
                 "url": "http://127.0.0.1:8000/catalog/sse",
                 "transport": "sse"
             }

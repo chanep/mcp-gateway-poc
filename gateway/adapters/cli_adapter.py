@@ -92,7 +92,7 @@ class CliAdapter(BaseAdapter):
                 "title": args["title"],
                 "body": args["body"],
                 "status": "OPEN",
-                "html_url": f"https://github.com/dialpad-org/dialpad-core/issues/{len(self._mock_issues) + 101}",
+                "html_url": f"https://github.com/phonecentral-org/phonecentral-core/issues/{len(self._mock_issues) + 101}",
                 "_source": "CLI Adapter (Mock Runner)"
             }
             self._mock_issues.append(new_issue)

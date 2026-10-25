@@ -38,7 +38,7 @@ servers:
   telephony_api:
     type: http_mapping
     base_url: "http://127.0.0.1:8001"
-    description: "Internal Dialpad telephony and customer data API (UV/FST)."
+    description: "Internal PhoneCentral telephony and customer data API (UV/FST)."
     tools:
       get_call:
         risk: read

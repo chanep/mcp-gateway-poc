@@ -38,7 +38,7 @@ async def load_gateway_tools(
     Selectively wraps mutating/destructive tools with dynamic Human-in-the-Loop.
     """
     client = MultiServerMCPClient({
-        "dialpad_gateway": {
+        "phonecentral_gateway": {
             "url": gateway_url,
             "transport": "sse"
         }

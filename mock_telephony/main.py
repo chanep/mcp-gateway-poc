@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Mock Telephony & UV API",
-    description="Microservice simulating Dialpad's internal telephony API with call and customer records containing PII.",
+    description="Microservice simulating PhoneCentral's internal telephony API with call and customer records containing PII.",
     lifespan=lifespan
 )
 
@@ -33,7 +33,7 @@ CALLS_DB: Dict[str, Dict[str, Any]] = {
         "customer_email": "alice.cooper@enterprise-client.com",
         "customer_name": "Alice Cooper",
         "csat_score": 1,
-        "recording_url": "https://storage.internal.dialpad/recordings/c-901.mp3",
+        "recording_url": "https://storage.internal.phonecentral/recordings/c-901.mp3",
         "transcript_snippet": "Customer stated: 'I tried sending the code to my phone +14155552671 and your app crashed with error 500.'"
     },
     "c-902": {
@@ -47,7 +47,7 @@ CALLS_DB: Dict[str, Dict[str, Any]] = {
         "customer_email": "bob.smith@techcorp.io",
         "customer_name": "Bob Smith",
         "csat_score": 5,
-        "recording_url": "https://storage.internal.dialpad/recordings/c-902.mp3",
+        "recording_url": "https://storage.internal.phonecentral/recordings/c-902.mp3",
         "transcript_snippet": "Sales discovery call completed successfully."
     },
     "c-903": {
@@ -61,7 +61,7 @@ CALLS_DB: Dict[str, Dict[str, Any]] = {
         "customer_email": "carol.danvers@avengers.org",
         "customer_name": "Carol Danvers",
         "csat_score": 3,
-        "recording_url": "https://storage.internal.dialpad/recordings/c-903.mp3",
+        "recording_url": "https://storage.internal.phonecentral/recordings/c-903.mp3",
         "transcript_snippet": "Audio stuttering on WebRTC client."
     }
 }

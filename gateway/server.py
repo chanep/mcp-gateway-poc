@@ -25,9 +25,9 @@ for _name in ("uvicorn.access", "mcp", "mcp.server.lowlevel.server"):
 
 # 1. Instantiate MCP Server with domain boundary instructions
 mcp_server = FastMCP(
-    "dialpad-mcp-gateway",
+    "phonecentral-mcp-gateway",
     instructions=(
-        "This MCP Gateway centralizes ONLY Dialpad internal engineering systems: "
+        "This MCP Gateway centralizes ONLY PhoneCentral internal engineering systems: "
         "ticket management (Jira / tickets.db), repositories and PRs (GitHub), "
         "and internal telephony APIs (UV/FST). It does not contain external tools, "
         "weather, news, or general world knowledge."
@@ -38,18 +38,25 @@ catalog = CatalogService()
 
 # 2. The 5 Dynamic Meta-Tools of the Unified Catalog
 @mcp_server.tool()
-def search_tools(query: str, limit: int = 5) -> str:
+def search_tools(
+    query: Annotated[str, Field(description="Keywords describing the capability or domain to search for (e.g. 'call', 'ticket', 'issue')")],
+    limit: Annotated[int, Field(default=5, description="Maximum number of matching tools to return")] = 5
+) -> str:
     """
-    Search tools in the Dialpad internal engineering catalog (Jira, GitHub, telephony).
-    Do not use for weather, news, or general knowledge.
+    Step 1 of Gateway workflow: Search available upstream tools across PhoneCentral internal engineering systems (Jira/tickets, GitHub repositories, telephony APIs).
+    Returns matching server names, tool names, risk levels, and brief descriptions.
+    Do not use for weather, news, or general world knowledge.
     """
     results = catalog.search_tools(query, limit)
     return json.dumps(results, ensure_ascii=False)
 
 @mcp_server.tool()
-def get_tool_schema(server: str, tool: str) -> str:
+def get_tool_schema(
+    server: Annotated[str, Field(description="Name of the backend server returned by search_tools")],
+    tool: Annotated[str, Field(description="Name of the tool returned by search_tools")]
+) -> str:
     """
-    Get full JSON Schema and parameter descriptions for a discovered tool in the catalog.
+    Step 2 of Gateway workflow: Inspect the full JSON input schema and required arguments for a tool discovered via `search_tools` before invoking it.
     """
     try:
         schema = catalog.get_tool_schema(server, tool)
@@ -60,18 +67,18 @@ def get_tool_schema(server: str, tool: str) -> str:
 @mcp_server.tool()
 async def invoke_read(
     server: Annotated[str, Field(description="Name of the backend server")],
-    tool: Annotated[str, Field(description="Name of the tool on that server")],
-    arguments: Annotated[Optional[Dict[str, Any]], Field(default=None, description="Input parameters dictionary to pass to the upstream tool")] = None,
-    fields: Annotated[Optional[List[str]], Field(default=None, description="Response Projection: optional list of specific property names to return from the response payload (e.g. ['id', 'status']). When specific attributes are needed, provide them to filter the response at the Gateway boundary and minimize token usage.")] = None
+    tool: Annotated[str, Field(description="Name of the read-only tool on that server")],
+    arguments: Annotated[Optional[Dict[str, Any]], Field(default=None, description="Input parameters dictionary matching the tool's schema")] = None,
+    fields: Annotated[Optional[List[str]], Field(default=None, description="Response Projection: optional list of specific field names to extract from the response payload (e.g. ['id', 'status']). Always specify `fields` when the user only needs specific attributes from a record to minimize payload size and token usage.")] = None
 ) -> str:
     """
-    Execute a READ-ONLY tool (risk: read).
-    Automatically applies PII Redaction (P4) and Response Projection (P7).
+    Step 3 of Gateway workflow (Read): Execute a READ-ONLY upstream tool (risk: read).
+    Automatically enforces PII Redaction and optional Response Projection (`fields`).
 
     Response Projection (Context Optimization):
-    - When your task or query requires only specific attributes from the upstream record, pass those key names in `fields` (e.g. fields=['id', 'status']).
-    - The Gateway filters out unrequested keys, returning a minimal payload.
-    - Omit or pass None only if you genuinely require the entire record.
+    - When the query requires only specific attributes from the upstream response, pass those key names in `fields` (e.g. fields=['id', 'status']).
+    - The Gateway filters the payload at the boundary and returns only the requested keys.
+    - Omit `fields` only when the full record is needed.
     """
     result = await catalog.execute_tool(
         invoked_risk="read",
@@ -84,10 +91,14 @@ async def invoke_read(
     return json.dumps(result, ensure_ascii=False)
 
 @mcp_server.tool()
-async def invoke_write(server: str, tool: str, arguments: Optional[Dict[str, Any]] = None) -> str:
+async def invoke_write(
+    server: Annotated[str, Field(description="Name of the backend server")],
+    tool: Annotated[str, Field(description="Name of the mutating tool on that server")],
+    arguments: Annotated[Optional[Dict[str, Any]], Field(default=None, description="Input parameters dictionary matching the tool's schema")] = None
+) -> str:
     """
-    Execute a MUTATING tool (risk: write).
-    Triggers Human-in-the-loop review on the agent.
+    Step 3 of Gateway workflow (Write): Execute a MUTATING upstream tool (risk: write), such as creating issues or updating records.
+    Triggers Human-in-the-loop approval before execution.
     """
     result = await catalog.execute_tool(
         invoked_risk="write",
@@ -99,10 +110,14 @@ async def invoke_write(server: str, tool: str, arguments: Optional[Dict[str, Any
     return json.dumps(result, ensure_ascii=False)
 
 @mcp_server.tool()
-async def invoke_destructive(server: str, tool: str, arguments: Optional[Dict[str, Any]] = None) -> str:
+async def invoke_destructive(
+    server: Annotated[str, Field(description="Name of the backend server")],
+    tool: Annotated[str, Field(description="Name of the destructive tool on that server")],
+    arguments: Annotated[Optional[Dict[str, Any]], Field(default=None, description="Input parameters dictionary matching the tool's schema")] = None
+) -> str:
     """
-    Execute a DESTRUCTIVE tool (risk: destructive).
-    Rejects execution if the tool was not declared destructive in the registry.
+    Step 3 of Gateway workflow (Destructive): Execute a DESTRUCTIVE upstream tool (risk: destructive).
+    Rejects execution if the tool is not classified as destructive in the registry.
     """
     result = await catalog.execute_tool(
         invoked_risk="destructive",
@@ -127,7 +142,7 @@ async def lifespan(app: FastAPI):
 
 # 4. FastAPI App with Observability endpoints and mounted MCP SSE sub-app
 app = FastAPI(
-    title="Dialpad MCP Gateway",
+    title="PhoneCentral MCP Gateway",
     description="Centralized tool gateway for AI coding agents (inspired by Uber).",
     lifespan=lifespan
 )

@@ -21,9 +21,9 @@ Este proyecto implementa **exactamente esta arquitectura enterprise** en tu máq
 
 ---
 
-## 1. Matriz de Problemas Resueltos: Uber / Dialpad vs. Este PoC
+## 1. Matriz de Problemas Resueltos: Uber / PhoneCentral vs. Este PoC
 
-| # | Problema Real (Uber / Dialpad) | Causa Raíz sin Gateway | Cómo lo resuelve este PoC Local | Demostración en el PoC |
+| # | Problema Real (Uber / PhoneCentral) | Causa Raíz sin Gateway | Cómo lo resuelve este PoC Local | Demostración en el PoC |
 |---|---|---|---|---|
 | **P1** | **Setup frágil (Developer Friction)** | Cada laptop debe instalar y autenticar `gh`, tokens de Jira, SDKs de GCP, etc. | **1 sola URL y 1 sola conexión**: El agente LangGraph solo conoce `http://localhost:8000/catalog/sse`. | El agente funciona sin que LangGraph tenga tokens de GitHub ni conexión a SQLite. |
 | **P2** | **Riesgo de seguridad / AuthZ permisivo** | El agente usa credenciales de dev con permisos amplios (puede borrar DBs o repos). | **Separación de riesgos por diseño**: Clasificación en YAML (`read`, `write`, `destructive`). El Gateway rechaza si hay discordancia. | Si el agente llama `invoke_read` sobre `create_issue`, el Gateway devuelve HTTP 403 Forbidden. |

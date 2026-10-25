@@ -32,7 +32,7 @@ def init_db():
             "Customer reported that during call c-901 there was an unexpected termination and the app threw a 500 error when sending a verification SMS.",
             "OPEN",
             "CRITICAL",
-            "john@dialpad.com",
+            "john@phonecentral.com",
             "c-901"
         ),
         (
@@ -41,7 +41,7 @@ def init_db():
             "Transcriptions for calls exceeding 10 minutes take more than 20 minutes to process.",
             "IN_PROGRESS",
             "HIGH",
-            "mary@dialpad.com",
+            "mary@phonecentral.com",
             "c-902"
         ),
         (
@@ -50,7 +50,7 @@ def init_db():
             "Observed packet loss for clients on unstable UDP connections during call c-903.",
             "RESOLVED",
             "MEDIUM",
-            "peter@dialpad.com",
+            "peter@phonecentral.com",
             "c-903"
         ),
         (
@@ -59,7 +59,7 @@ def init_db():
             "Certificate expires in 5 days. Must renew before Friday deployment.",
             "OPEN",
             "LOW",
-            "devops@dialpad.com",
+            "devops@phonecentral.com",
             None
         )
     ]
