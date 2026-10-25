@@ -1,16 +1,16 @@
-# MCP Gateway de Uber, aplicado a Dialpad
+# MCP Gateway de Uber, aplicado a PhoneCentral
 
 Análisis del artículo [Designing Uber's MCP Gateway](https://www.uber.com/us/en/blog/designing-mcp-gateway/)
-y de qué significaría una arquitectura parecida en Dialpad.
+y de qué significaría una arquitectura parecida en PhoneCentral.
 
 **Índice**
 
 - [El artículo en una línea](#el-artículo-en-una-línea)
 - [0) Conceptos base: tools, MCP client, server y transporte](#0-conceptos-base-tools-mcp-client-server-y-transporte)
-- [1) Un flow agéntico en Dialpad, contado como historia](#1-un-flow-agéntico-en-dialpad-contado-como-historia)
+- [1) Un flow agéntico en PhoneCentral, contado como historia](#1-un-flow-agéntico-en-phonecentral-contado-como-historia)
 - [2) El mecanismo interno del flow de Juan](#2-el-mecanismo-interno-del-flow-de-juan)
 - [3) Los problemas del mecanismo actual](#3-los-problemas-del-mecanismo-actual)
-- [4) Adaptación a Dialpad de la arquitectura de Uber](#4-adaptación-a-dialpad-de-la-arquitectura-de-uber)
+- [4) Adaptación a PhoneCentral de la arquitectura de Uber](#4-adaptación-a-phonecentral-de-la-arquitectura-de-uber)
 - [5) Lo que el gateway no resuelve, riesgos nuevos y cómo arrancar](#5-lo-que-el-gateway-no-resuelve-riesgos-nuevos-y-cómo-arrancar)
 - [Apéndice: resumen del artículo de Uber](#apéndice-resumen-del-artículo-de-uber)
 
@@ -88,12 +88,12 @@ Los de [.mcp.json](../.mcp.json):
 | ---------------- | ---------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------- |
 | **atlassian**    | HTTP                         | Nube de Atlassian (`mcp.atlassian.com`)           | Atlassian                          | OAuth en el browser |
 | **pagerduty**    | stdio → HTTP (con un puente) | Puente local + server real en `mcp.pagerduty.com` | PagerDuty (el puente: open source) | `PAGERDUTY_TOKEN`   |
-| **dialtone**     | stdio                        | Tu laptop (proceso `node`)                        | Dialpad (equipo de Dialtone)       | Ninguna             |
-| **client-tools** | stdio                        | Tu laptop (proceso `node`)                        | Dialpad (goblin-client-tools)      | Token de GitHub     |
+| **dialtone**     | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (equipo de Dialtone)       | Ninguna             |
+| **client-tools** | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (goblin-client-tools)      | Token de GitHub     |
 
 **Atlassian: el server remoto "puro".** Claude Code no ejecuta nada local. Abre una conexión HTTP a
 `mcp.atlassian.com`; la primera vez te logueás por OAuth, y desde ahí cada `getJiraIssue` es un request
-HTTPS. Atlassian programó, hostea y opera el server. Dialpad solo lo consume.
+HTTPS. Atlassian programó, hostea y opera el server. PhoneCentral solo lo consume.
 
 **PagerDuty: remoto, pero con un puente local.** La config es `npx mcp-remote https://mcp.pagerduty.com/mcp`:
 
@@ -104,12 +104,12 @@ Claude Code ──stdio──► mcp-remote (en la laptop) ──HTTP + token─
 `mcp-remote` es un adaptador: Claude Code cree que habla con un server local por stdio, y el puente reenvía
 todo por HTTP, inyectando tu token en el header.
 
-**Dialtone: server 100% local.** `npx @dialpad/dialtone-mcp-server` descarga un paquete npm de Dialpad y lo
+**Dialtone: server 100% local.** `npx @phonecentral/dialtone-mcp-server` descarga un paquete npm de PhoneCentral y lo
 corre en la laptop. Los datos de componentes, tokens e íconos vienen **empaquetados dentro del paquete**,
 así que no llama a nada externo.
 
 **client-tools: local, pero sale a internet por dentro.** También corre en la laptop vía `npx`, pero sus
-tools leen código del repo `dialpad/goblin-client-tools` **usando la API de GitHub** con tu token. Hacia
+tools leen código del repo `phonecentral/goblin-client-tools` **usando la API de GitHub** con tu token. Hacia
 Claude Code habla MCP por stdio; hacia GitHub habla REST normal, sin MCP.
 
 ```
@@ -130,16 +130,16 @@ ni client ni server MCP, solo un comando y su output.
 
 ### 0.4 Glean: dos roles distintos
 
-**a) Glean como MCP server (Claude es el client).** Dialpad tiene un **Glean MCP server** que cada dev
+**a) Glean como MCP server (Claude es el client).** PhoneCentral tiene un **Glean MCP server** que cada dev
 conecta a nivel usuario en su herramienta (ver la skill
 [firewatcher-error-scrub](../.claude/skills/firewatcher-error-scrub/SKILL.md) y la página de Confluence
-*"Augment your AI tools with Dialpad context via Glean MCP"*). Es remoto (HTTP), lo hostea e implementa
-Glean, y se autentica con el SSO de Dialpad.
+*"Augment your AI tools with PhoneCentral context via Glean MCP"*). Es remoto (HTTP), lo hostea e implementa
+Glean, y se autentica con el SSO de PhoneCentral.
 
 **b) Glean como producto, internamente.** Cuando le preguntás algo a Glean desde su web, Glean **no** sale
 a consultar Jira por MCP en ese momento. Ya tiene todo **indexado de antemano** mediante *connectors*:
 integraciones propias que copian periódicamente Jira, Confluence, Slack y Drive a su índice. Es otro modelo:
-indexar antes en vez de consultar en vivo. (No verificado: si Dialpad tiene configuradas además las funciones
+indexar antes en vez de consultar en vivo. (No verificado: si PhoneCentral tiene configuradas además las funciones
 de agentes de Glean que llaman a servers MCP externos.)
 
 ```
@@ -213,7 +213,7 @@ mensaje del dev.
 
 ```json
 {"type": "tool_use", "name": "mcp__atlassian__getJiraIssue",
- "input": {"cloudId": "dialpad.atlassian.net", "issueIdOrKey": "DP-200001"}}
+ "input": {"cloudId": "phonecentral.atlassian.net", "issueIdOrKey": "DP-200001"}}
 ```
 
 (Si el schema no estaba cargado, antes hay una vuelta extra con `ToolSearch`, ver 0.6. Si no conocía el
@@ -229,7 +229,7 @@ mensaje del dev.
 ```json
 → {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
    "params": {"name": "getJiraIssue",
-              "arguments": {"cloudId": "dialpad.atlassian.net", "issueIdOrKey": "DP-200001"}}}
+              "arguments": {"cloudId": "phonecentral.atlassian.net", "issueIdOrKey": "DP-200001"}}}
 ```
 
 **Paso 11. El server hace el trabajo.** El server de Atlassian valida el token, llama a la **API REST
@@ -386,7 +386,7 @@ el modelo son tools distintas con caminos distintos. Esa duplicación es uno de 
 
 ---
 
-## 1) Un flow agéntico en Dialpad, contado como historia
+## 1) Un flow agéntico en PhoneCentral, contado como historia
 
 **Lunes, 10:00.** A Juan, ingeniero de UV, le asignan el ticket **DP-200001** (ficticio): *"Algunos usuarios
 reciben un error 500 al mandar un SMS desde la app"*.
@@ -427,7 +427,7 @@ diferente**:
   `sentry`, `pup`.
 - Otros son **skills** del repo que llaman directo a una API REST (Datastore, FST artifacts).
 
-Y eso es solo Claude Code. Hay otros flows agénticos en Dialpad con el mismo patrón: **Glean** responde
+Y eso es solo Claude Code. Hay otros flows agénticos en PhoneCentral con el mismo patrón: **Glean** responde
 preguntas cruzando Jira, Confluence, Slack y Drive; las skills de **on-call** (`cbe-oncall-investigate`,
 `telephony-investigation`) cruzan PagerDuty, Observe y Jira; y el agente `pr-reviewer` corre por cron. Cada
 uno arma sus propias conexiones.
@@ -447,12 +447,12 @@ cada uno de los 10 pasos**.
 | ---------- | ------------------------------------------------------- | -------------------------------------- |
 | Jira       | `jira` CLI + Atlassian MCP en [.mcp.json](../.mcp.json) | API token de Jira + OAuth de Atlassian |
 | Confluence | (el mismo Atlassian MCP)                                | OAuth de Atlassian                     |
-| Observe    | CLI de Observe (vía plugin `dialpad`)                   | Token de Observe                       |
+| Observe    | CLI de Observe (vía plugin `phonecentral`)                   | Token de Observe                       |
 | Sentry     | CLI propio del repo (`tools/sentry_cli/`)               | `SENTRY_AUTH_TOKEN`                    |
 | PagerDuty  | `mcp-remote` vía `npx`                                  | `PAGERDUTY_TOKEN` en el entorno        |
 | Datastore  | `gcloud`                                                | Su login de Google (`gcloud auth`)     |
 | GitHub     | `gh` CLI                                                | Token de GitHub                        |
-| Glean      | Glean MCP a nivel usuario                               | SSO de Dialpad                         |
+| Glean      | Glean MCP a nivel usuario                               | SSO de PhoneCentral                         |
 
 Son unas **8 credenciales personales**, cada una con su forma de obtenerla, renovarla y guardarla.
 
@@ -462,8 +462,8 @@ Son unas **8 credenciales personales**, cada una con su forma de obtenerla, reno
 | ---- | -------------------- | ---------------------------------------- | ---------------------------------------------------- | ------------------------------------- |
 | 1    | Leer el ticket       | `Bash` → `jira issue view`               | CLI → API REST de Jira                               | Open source (jira-cli)                |
 | 2    | Buscar docs          | `mcp__atlassian__searchConfluence`       | MCP client → HTTP → server de Atlassian → Confluence | Atlassian                             |
-| 3    | Buscar logs          | `Bash` → `observe query ...`             | CLI → API de Observe                                 | Dialpad (plugin)                      |
-| 4    | Stack trace          | `Bash` → `uv run ... sentry issue stack` | CLI del repo → API web de Sentry                     | Dialpad (`tools/sentry_cli`)          |
+| 3    | Buscar logs          | `Bash` → `observe query ...`             | CLI → API de Observe                                 | PhoneCentral (plugin)                      |
+| 4    | Stack trace          | `Bash` → `uv run ... sentry issue stack` | CLI del repo → API web de Sentry                     | PhoneCentral (`tools/sentry_cli`)          |
 | 5    | Incidentes           | `mcp__pagerduty__...`                    | MCP client → stdio → `mcp-remote` → HTTP → PagerDuty | PagerDuty + puente open source        |
 | 6    | Entidad en Datastore | `Bash` → `curl` con token de `gcloud`    | curl → API REST de Google Datastore                  | Nadie: la skill trae el curl "a mano" |
 | 7-8  | Código, fix y tests  | `Read`, `Grep`, `Edit`, `Bash`           | Local                                                | Anthropic (built-ins)                 |
@@ -512,7 +512,7 @@ comando correr.
 1. **Todo converge en la laptop.** Cada "integración" corre o se origina ahí.
 2. **Todo se ejecuta con las credenciales personales de Juan.** El agente puede hacer lo mismo que Juan, sin
    más ni menos.
-3. **Hay tres tipos de integración mezclados:** servers MCP (de terceros o de Dialpad), CLIs (de terceros o
+3. **Hay tres tipos de integración mezclados:** servers MCP (de terceros o de PhoneCentral), CLIs (de terceros o
    hechos en casa) y skills con comandos "a mano".
 4. **Cada adaptador lo escribió alguien distinto**, con su propio formato de salida, manejo de errores y
    control (o no) de tamaño.
@@ -634,9 +634,9 @@ Y se repite entre equipos:
 
 > Uber: *"teams built integrations independently → fragmentation and duplicated infrastructure"*.
 
-### Problema 6: Los sistemas propios de Dialpad no tienen "tools" (el problema más grande)
+### Problema 6: Los sistemas propios de PhoneCentral no tienen "tools" (el problema más grande)
 
-Este es **el punto central del artículo de Uber**. Qué pasa con los sistemas **de Dialpad**, no de terceros:
+Este es **el punto central del artículo de Uber**. Qué pasa con los sistemas **de PhoneCentral**, no de terceros:
 
 | Sistema interno     | Cómo accede el agente hoy                                                                  |
 | ------------------- | ------------------------------------------------------------------------------------------ |
@@ -681,28 +681,28 @@ punto intermedio es justamente el gateway.
 
 ---
 
-## 4) Adaptación a Dialpad de la arquitectura de Uber
+## 4) Adaptación a PhoneCentral de la arquitectura de Uber
 
-### 4.1 Antes de diseñar: qué ya existe en Dialpad
+### 4.1 Antes de diseñar: qué ya existe en PhoneCentral
 
 Hay piezas en el repo que cambian bastante el diseño:
 
 | Pieza existente        | Dónde                                                                        | Por qué importa                                                                                                                                                                                                                                                                                                  |
 | ---------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`dialpad-user-mcp`** | [dp-ai-agents/dialpad_user_mcp/](../dp-ai-agents/dialpad_user_mcp/README.md) | Un server MCP interno en Cloud Run para los agentes **de producto** (usuarios finales). Ya aplica varios principios de Uber: no tiene credenciales propias (reenvía el token del usuario), tiene un **registry auditado** de endpoints permitidos, es solo lectura y "da forma" a las respuestas (`shaping.py`). |
-| **`@public_api`**      | [ubervoice/frontend/apis/endpoints/](../ubervoice/frontend/apis/endpoints/)  | ~409 endpoints de la API pública v2, con params y respuesta tipados (pydantic), docstring y nombre estable. Ya generan OpenAPI para la doc pública (`ApiDocSet`). Es lo más parecido que tiene Dialpad al **IDL** de Uber.                                                                                       |
+| **`phonecentral-user-mcp`** | [dp-ai-agents/phonecentral_user_mcp/](../dp-ai-agents/phonecentral_user_mcp/README.md) | Un server MCP interno en Cloud Run para los agentes **de producto** (usuarios finales). Ya aplica varios principios de Uber: no tiene credenciales propias (reenvía el token del usuario), tiene un **registry auditado** de endpoints permitidos, es solo lectura y "da forma" a las respuestas (`shaping.py`). |
+| **`@public_api`**      | [ubervoice/frontend/apis/endpoints/](../ubervoice/frontend/apis/endpoints/)  | ~409 endpoints de la API pública v2, con params y respuesta tipados (pydantic), docstring y nombre estable. Ya generan OpenAPI para la doc pública (`ApiDocSet`). Es lo más parecido que tiene PhoneCentral al **IDL** de Uber.                                                                                       |
 | **`@openapi_schema`**  | [common/lib/openapi/wrappers.py](../common/lib/openapi/wrappers.py)          | Schemas marshmallow en handlers internos. Solo ~37 usos en UV, en su mayoría de login/OAuth.                                                                                                                                                                                                                     |
 | **`egress-proxy`**     | [egress-proxy/](../egress-proxy/README.md)                                   | Un relay en Cloud Run con allowlist de destinos. Precedente de "servicio intermedio chico, con allowlist estricta y o11y propia".                                                                                                                                                                                |
 
 Y una diferencia de escala clave:
 
-|              | Uber                                        | Dialpad                                                                     |
+|              | Uber                                        | PhoneCentral                                                                     |
 | ------------ | ------------------------------------------- | --------------------------------------------------------------------------- |
 | Backends     | Miles de microservicios                     | Pocos monolitos grandes (UV, FST, UC) + servicios Cloud Run                 |
 | Contratos    | IDL (Protobuf/Thrift) en todos lados        | `@public_api` tipado; las `/api/*` internas son *view models* sin versionar |
 | Consecuencia | Autogenerar tools desde IDL rinde muchísimo | Autogenerar rinde menos y es más riesgoso                                   |
 
-El README de `dialpad-user-mcp` da un buen ejemplo del riesgo: `/api/voicerecording` **tiene** un check de
+El README de `phonecentral-user-mcp` da un buen ejemplo del riesgo: `/api/voicerecording` **tiene** un check de
 acceso, pero es de alcance company-wide y permite el acceso por defecto si la grabación no tiene llamada
 asociada. Exponer endpoints automáticamente, sin leer el handler, sería peligroso.
 
@@ -712,9 +712,9 @@ los admins ven todas las llamadas de la empresa, y que **las API keys de usuario
 API v2 **ya cambia el alcance según la credencial**, así que elegir con qué credencial llama el gateway es una
 decisión de seguridad.
 
-### 4.2 Equivalencias Uber → Dialpad
+### 4.2 Equivalencias Uber → PhoneCentral
 
-| Uber                         | Para qué                          | Equivalente natural en Dialpad                                                     |
+| Uber                         | Para qué                          | Equivalente natural en PhoneCentral                                                     |
 | ---------------------------- | --------------------------------- | ---------------------------------------------------------------------------------- |
 | MCP Registry                 | Catálogo, ownership, habilitación | YAML en el repo + CODEOWNERS (o Datastore si hace falta UI)                        |
 | Proxy Gateway                | Data plane                        | Servicio en Cloud Run (`mcp-gateway`)                                              |
@@ -732,12 +732,12 @@ decisión de seguridad.
 No se construye un gateway. Se ordena lo que hay:
 
 - **Una sola forma por sistema**: elegir un camino para Jira (MCP o CLI) y retirar el otro de las skills.
-- **Versiones fijas**: nada de `npx ...@latest`; las versiones se fijan en el plugin `dialpad-tools`.
+- **Versiones fijas**: nada de `npx ...@latest`; las versiones se fijan en el plugin `phonecentral-tools`.
 - **Servers MCP internos por dominio**, cada uno en Cloud Run y mantenido por su equipo dueño:
   `datastore-readonly-mcp`, un MCP de llamadas de UV (en lugar de CSR por scraping), etc.
 
 ```
- LAPTOP                                   │  GCP (Dialpad)                │ TERCEROS
+ LAPTOP                                   │  GCP (PhoneCentral)                │ TERCEROS
  Claude Code                              │                               │
   ├─ client ─────────────────────────────┼───────────────────────────────┼─► Atlassian MCP
   ├─ client ─────────────────────────────┼───────────────────────────────┼─► PagerDuty MCP
@@ -770,7 +770,7 @@ No se construye un gateway. Se ordena lo que hay:
 
 #### B.1 ¿Qué es el `mcp-gateway`?
 
-**Un server MCP implementado por Dialpad que hace de pasamanos dinámico, guiado por una configuración propia
+**Un server MCP implementado por PhoneCentral que hace de pasamanos dinámico, guiado por una configuración propia
 (custom) en YAML.**
 
 Lo particular es que **juega dos roles a la vez**:
@@ -822,7 +822,7 @@ config cada tanto.
 
 **"Omni" es solo el nombre que le puso Uber** (del latín *omnis*, "todo"): **un único endpoint MCP que da
 acceso a todos los servers** detrás del gateway, mediante tools de descubrimiento. Es el "mozo" de Atlassian
-(sección 0.7), pero para todo Dialpad. Acá lo llamamos **`catalog`**.
+(sección 0.7), pero para todo PhoneCentral. Acá lo llamamos **`catalog`**.
 
 Hay dos formas de exponer el gateway:
 
@@ -865,7 +865,7 @@ de tokens**:
    este link"*.
 2. Juan hace el OAuth de Atlassian **una vez**, pero ahora el que recibe el token es el **gateway**, no la
    laptop.
-3. El gateway lo guarda cifrado (Secret Manager o Datastore cifrado), asociado a `juan@dialpad.com`.
+3. El gateway lo guarda cifrado (Secret Manager o Datastore cifrado), asociado a `juan@phonecentral.com`.
 4. En cada llamada futura: *"es Juan → busco su token de Atlassian → lo uso"*.
 
 Es lo que Uber llama **token exchange**: el agente se autentica una sola vez contra el gateway, y el gateway
@@ -879,7 +879,7 @@ Es lo que Uber llama **token exchange**: el agente se autentica una sola vez con
 Juan pregunta: **"¿De qué trata DP-200001 y qué pasó con la llamada del ticket?"**
 
 ```
- LAPTOP DE JUAN       │  GCP (Dialpad)                                          │ DESTINOS
+ LAPTOP DE JUAN       │  GCP (PhoneCentral)                                          │ DESTINOS
                       │  ┌──────────────── mcp-gateway ─────────────────────┐   │
  Claude Code          │  │ CONTROL PLANE: registry (YAML) + catálogo         │   │
   └─ client ──HTTP────┼─►│ DATA PLANE: authN → authZ → ruteo → redacción     │───┼─► Atlassian MCP
@@ -899,7 +899,7 @@ server: atlassian
 type: mcp_proxy                       # tipo 1: proxy a MCP externo
 upstream: https://mcp.atlassian.com/v2/mcp
 credential: user_oauth                # usa el token de cada usuario (vault)
-owner: "@dialpad/dev-productivity"
+owner: "@phonecentral/dev-productivity"
 tools:
   getJiraIssue:      { enabled: true,  risk: read }
   createJiraIssue:   { enabled: true,  risk: write }
@@ -911,7 +911,7 @@ tools:
 server: uv
 type: http_mapping                    # tipo 2: mapeo a endpoint interno
 credential: support_readonly          # credencial interna de solo lectura (a definir)
-owner: "@dialpad/public-apis"
+owner: "@phonecentral/public-apis"
 tools:
   get_call_info:
     enabled: true
@@ -939,18 +939,18 @@ Cada pocos minutos repite esto, y así un cambio en el YAML (mergeado por PR) en
 **Paso A.1. Config.** [.mcp.json](../.mcp.json) tiene una sola entrada:
 
 ```json
-{ "mcpServers": { "dialpad": { "type": "http", "url": "https://mcp-gateway.<interno>/catalog/mcp" } } }
+{ "mcpServers": { "phonecentral": { "type": "http", "url": "https://mcp-gateway.<interno>/catalog/mcp" } } }
 ```
 
 **Paso A.2. Login.** La primera vez, Claude Code abre el browser y Juan se loguea con **Google SSO** (MCP
-soporta OAuth). El gateway ahora sabe: "este client es `juan@dialpad.com`".
+soporta OAuth). El gateway ahora sabe: "este client es `juan@phonecentral.com`".
 
 **Paso A.3. Handshake + `tools/list`.**
 
 ```json
 → {"method": "tools/list"}
 ← {"result": {"tools": [
-     {"name": "search_tools",       "description": "Busca tools de Dialpad por intención...", ...},
+     {"name": "search_tools",       "description": "Busca tools de PhoneCentral por intención...", ...},
      {"name": "get_tool_schema",    ...},
      {"name": "invoke_read",        ...},
      {"name": "invoke_write",       ...},
@@ -958,7 +958,7 @@ soporta OAuth). El gateway ahora sabe: "este client es `juan@dialpad.com`".
   ]}}
 ```
 
-**Claude ve 5 tools, no 200.** Claude Code las registra como `mcp__dialpad__search_tools`, etc. Como son pocas,
+**Claude ve 5 tools, no 200.** Claude Code las registra como `mcp__phonecentral__search_tools`, etc. Como son pocas,
 ni siquiera hace falta el modo deferred.
 
 ##### Fase B: Juan hace la pregunta
@@ -966,7 +966,7 @@ ni siquiera hace falta el modo deferred.
 **Paso B.1. Buscar.** El modelo no conoce ninguna tool de Jira, así que busca:
 
 ```json
-{"name": "mcp__dialpad__search_tools", "input": {"query": "leer un ticket de Jira"}}
+{"name": "mcp__phonecentral__search_tools", "input": {"query": "leer un ticket de Jira"}}
 ```
 
 El gateway busca en su catálogo y **solo devuelve tools que Juan tiene permitidas**:
@@ -979,7 +979,7 @@ El gateway busca en su catálogo y **solo devuelve tools que Juan tiene permitid
 **Paso B.2. Pedir el schema.**
 
 ```json
-{"name": "mcp__dialpad__get_tool_schema", "input": {"server": "atlassian", "tool": "getJiraIssue"}}
+{"name": "mcp__phonecentral__get_tool_schema", "input": {"server": "atlassian", "tool": "getJiraIssue"}}
 ```
 
 → descripción completa + JSON Schema (`cloudId`, `issueIdOrKey`).
@@ -987,7 +987,7 @@ El gateway busca en su catálogo y **solo devuelve tools que Juan tiene permitid
 **Paso B.3. Invocar.**
 
 ```json
-{"name": "mcp__dialpad__invoke_read",
+{"name": "mcp__phonecentral__invoke_read",
  "input": {"server": "atlassian", "tool": "getJiraIssue",
            "args": {"cloudId": "...", "issueIdOrKey": "DP-200001"}}}
 ```
@@ -998,7 +998,7 @@ Claude Code chequea **sus** permisos: `invoke_read` está permitida siempre, as�
 
 | #   | Paso       | Detalle                                                                                                              |
 | --- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1   | AuthN      | Token de Google válido → es `juan@dialpad.com`, agente `claude-code`                                                 |
+| 1   | AuthN      | Token de Google válido → es `juan@phonecentral.com`, agente `claude-code`                                                 |
 | 2   | AuthZ      | `atlassian.getJiraIssue` está habilitada, Juan puede usarla, y el riesgo es `read`, igual que el `invoke` usado → OK |
 | 3   | Credencial | `credential: user_oauth` → busca en el vault el token de Atlassian de Juan                                           |
 | 4   | Ruteo      | Como **MCP client**, manda `tools/call getJiraIssue` a Atlassian con el token de Juan                                |
@@ -1074,7 +1074,7 @@ C es **todo B, sin cambiar nada**, más tres piezas:
 | **Code Mode**           | P7: resultados enormes             | Un CLI para agentes de código: los resultados van **a archivos**, no al contexto |
 
 ```
- GCP (Dialpad) — mcp-gateway
+ GCP (PhoneCentral) — mcp-gateway
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ CONTROL PLANE                                                            │
  │   ┌─────────────┐   abre PR    ┌────────────────────┐   carga            │
@@ -1100,13 +1100,13 @@ C es **todo B, sin cambiar nada**, más tres piezas:
 En Uber, la fuente es el **IDL**: archivos Protobuf/Thrift que describen cada método de cada servicio (nombre,
 parámetros con tipos, respuesta y comentario). Un IDL es un **contrato formal y legible por máquina**.
 
-En Dialpad no hay IDL central, pero hay **tres fuentes** con algo parecido:
+En PhoneCentral no hay IDL central, pero hay **tres fuentes** con algo parecido:
 
 | Fuente                                                        | Cantidad aprox.          | Calidad como "IDL"                                                                                             | Notas                                                            |
 | ------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **`@public_api`** (API pública v2)                            | **~409 endpoints** en UV | **Alta**: params y respuesta tipados con pydantic, docstring y nombre estable. Ya genera OpenAPI (`ApiDocSet`) | El alcance depende de la credencial                              |
 | **`@openapi_schema`** (handlers internos)                     | ~37 en UV                | Media: schemas marshmallow                                                                                     | Pocos, y muchos de login/OAuth: poco útiles para agentes         |
-| **Servers MCP propios** en Cloud Run (ej. `dialpad-user-mcp`) | Pocos hoy                | Alta: ya hablan MCP                                                                                            | Se detectan por un label en Cloud Run y se les hace `tools/list` |
+| **Servers MCP propios** en Cloud Run (ej. `phonecentral-user-mcp`) | Pocos hoy                | Alta: ya hablan MCP                                                                                            | Se detectan por un label en Cloud Run y se les hace `tools/list` |
 
 Los endpoints internos `/api/*` sin schema **no son una fuente**: no hay nada legible por máquina para leer.
 
@@ -1167,8 +1167,8 @@ tools:
 **El equipo dueño revisa el PR y decide:**
 
 - Si la descripción del LLM es correcta.
-- **`access_scope`**: ¿la respuesta es de un usuario, de toda la empresa o de todo Dialpad? Es la misma
-  pregunta que se hace `dialpad-user-mcp` en su registry auditado, y **no se puede inferir automáticamente**.
+- **`access_scope`**: ¿la respuesta es de un usuario, de toda la empresa o de todo PhoneCentral? Es la misma
+  pregunta que se hace `phonecentral-user-mcp` en su registry auditado, y **no se puede inferir automáticamente**.
 - **`credential`**: con qué identidad llama el gateway (recordar que la API v2 cambia el alcance según la
   credencial).
 - Qué grupos pueden usarla y qué campos se redactan.
@@ -1281,7 +1281,7 @@ niveles** de descubrimiento:
 
 | Nivel | Pregunta                          | Cómo se resuelve                                                               | ¿Estático o dinámico?    |
 | ----- | --------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| 1     | ¿Existe `dp-mcp` y cuándo usarlo? | Una **skill** (SKILL.md) en el plugin `dialpad-tools` + una línea en CLAUDE.md | Estático (texto)         |
+| 1     | ¿Existe `dp-mcp` y cuándo usarlo? | Una **skill** (SKILL.md) en el plugin `phonecentral-tools` + una línea en CLAUDE.md | Estático (texto)         |
 | 2     | ¿Qué tools hay detrás?            | `dp-mcp search "..."` le pregunta **al gateway**                               | Dinámico (catálogo vivo) |
 
 Cuando el gateway agrega 50 tools nuevas, **la skill no cambia**: el nivel 2 las encuentra solo.
@@ -1296,14 +1296,14 @@ Las skills se cargan con el mismo truco que las tools *deferred* (sección 0.6):
    cuerpo completo del SKILL.md.
 
 Por eso **la `description` es lo más importante**: tiene que hacer que el modelo la cargue *antes* de usar
-cualquiera de las dos puertas. Si no la carga, el modelo ve las tools `mcp__dialpad__*` y las usa para todo,
+cualquiera de las dos puertas. Si no la carga, el modelo ve las tools `mcp__phonecentral__*` y las usa para todo,
 incluso para lo que debería ir por Code Mode.
 
 Como refuerzo, una línea en [CLAUDE.md](../CLAUDE.md) (que **sí** se carga siempre, entera):
 
 ```markdown
-- **Dialpad systems (Jira, Confluence, UV, Datastore, PagerDuty...)**: load the `/dialpad:dp-mcp` skill
-  before any call to `mcp__dialpad__*` or `dp-mcp`. It decides which of the two to use.
+- **PhoneCentral systems (Jira, Confluence, UV, Datastore, PagerDuty...)**: load the `/phonecentral:dp-mcp` skill
+  before any call to `mcp__phonecentral__*` or `dp-mcp`. It decides which of the two to use.
 ```
 
 ##### Ejemplo de la skill completa
@@ -1313,17 +1313,17 @@ Escrita en castellano para este documento; la real iría en inglés, como el res
 ````markdown
 ---
 name: dp-mcp
-description: Acceso a sistemas de Dialpad (Jira, Confluence, GitHub, PagerDuty, UV, Datastore...) a través
-  del MCP gateway, por las tools `mcp__dialpad__*` o por el CLI `dp-mcp`. Cargar ANTES de consultar o
+description: Acceso a sistemas de PhoneCentral (Jira, Confluence, GitHub, PagerDuty, UV, Datastore...) a través
+  del MCP gateway, por las tools `mcp__phonecentral__*` o por el CLI `dp-mcp`. Cargar ANTES de consultar o
   modificar cualquiera de esos sistemas; define cuál de las dos vías usar. Reemplaza a los CLIs
   individuales (jira, gh, observe, sentry) y a los curl a mano.
 ---
 
-# Sistemas de Dialpad vía el MCP gateway
+# Sistemas de PhoneCentral vía el MCP gateway
 
 Hay dos vías al mismo gateway, con los mismos permisos, redacción y auditoría:
 
-- **Modo MCP**: las tools `mcp__dialpad__search_tools`, `get_tool_schema` e `invoke_read|write|destructive`.
+- **Modo MCP**: las tools `mcp__phonecentral__search_tools`, `get_tool_schema` e `invoke_read|write|destructive`.
   El resultado entra entero a tu contexto.
 - **Code Mode**: el CLI `dp-mcp` por Bash. El resultado va a stdout y lo podés redirigir a un archivo y
   procesarlo con `jq`/`grep`/Python sin leerlo entero.
@@ -1376,7 +1376,7 @@ pidas más páginas por MCP.
 
 | Respuesta del gateway         | Qué hacer                                                                               |
 | ----------------------------- | --------------------------------------------------------------------------------------- |
-| `not_authenticated`           | Pedirle al usuario que corra `dp-mcp login` (o que reconecte el server MCP `dialpad`)   |
+| `not_authenticated`           | Pedirle al usuario que corra `dp-mcp login` (o que reconecte el server MCP `phonecentral`)   |
 | `needs_connection: atlassian` | Pasarle al usuario el link que viene en la respuesta para conectar su cuenta (vault)    |
 | `forbidden`                   | No reintentar ni buscar otra vía: el usuario no tiene permiso para esa tool             |
 | `tool_disabled`               | La tool existe pero el equipo dueño no la habilitó; decírselo al usuario                |
@@ -1468,13 +1468,13 @@ for _risk in ('read', 'write', 'destructive'):
 ```
 
 Se distribuye como cualquier otra herramienta interna (por ejemplo, un paquete instalable desde el plugin
-`dialpad-tools`), junto con su skill.
+`phonecentral-tools`), junto con su skill.
 
 ##### Resumen: modo MCP vs. Code Mode
 
 |                          | Modo MCP (`catalog/mcp`)                                         | Code Mode (`dp-mcp`)                                  |
 | ------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| Cómo lo invoca el agente | Tools `mcp__dialpad__*`                                          | `Bash("dp-mcp ...")`                                  |
+| Cómo lo invoca el agente | Tools `mcp__phonecentral__*`                                          | `Bash("dp-mcp ...")`                                  |
 | Lo usa                   | Cualquier agente (Claude Code, bots, Glean, agentes de producto) | Agentes con shell (Claude Code)                       |
 | Cómo lo descubre         | `tools/list` al conectar                                         | Una skill + `dp-mcp search`                           |
 | Resultado                | Entra al contexto del modelo                                     | Va a stdout/archivo; el modelo lee solo lo que quiere |
@@ -1491,7 +1491,7 @@ y en cuántas el cliente menciona 'cancelar'?"**
 largos. Por MCP, todo eso entraría al contexto.
 
 ```
- LAPTOP DE JUAN         │  GCP (Dialpad) — mcp-gateway                                  │ DESTINOS
+ LAPTOP DE JUAN         │  GCP (PhoneCentral) — mcp-gateway                                  │ DESTINOS
                         │ ┌──────────────────────────────────────────────────────────┐  │
  Claude Code            │ │ CONTROL PLANE: crawler → registry YAML → catálogo        │  │
   ├─ client MCP ────────┼►│ DATA PLANE: authN → authZ → ruteo → redacción            │──┼─► UV (API v2)
@@ -1506,7 +1506,7 @@ largos. Por MCP, todo eso entraría al contexto.
 1. El lunes corre el crawler. Detecta que `call.list` (de `@public_api`) no está en el registry.
 2. Genera `registry/uv/call.yaml` con `list_calls` en `enabled: false` y la descripción reescrita por el LLM.
 3. Abre el PR *"mcp-registry: tools nuevas para uv (deshabilitadas)"*, asignado por CODEOWNERS a
-   `@dialpad/public-apis`.
+   `@phonecentral/public-apis`.
 4. El equipo revisa y completa:
    - `access_scope: company` (devuelve datos de toda la empresa consultada).
    - `credential: support_readonly` (credencial interna de solo lectura, a definir; ver C.7).
@@ -1588,15 +1588,15 @@ llamadas de hoy con CSAT ≤ 2; 9 fueron transferidas y en 6 el cliente menciona
 **El mismo pedido por MCP** serían varias páginas de `list_calls` más 20 `get_call_info`, y las 20
 transcripciones completas dentro del contexto.
 
-#### C.7 Riesgos propios de C en Dialpad
+#### C.7 Riesgos propios de C en PhoneCentral
 
-| Riesgo                                       | Por qué en Dialpad                                                                                                                                               | Mitigación                                                                                                   |
+| Riesgo                                       | Por qué en PhoneCentral                                                                                                                                               | Mitigación                                                                                                   |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **El decorator no dice quién puede ver qué** | `/api/voicerecording` tiene un check de acceso, pero es company-wide y permite el acceso por defecto si no hay llamada asociada. No se detecta leyendo el schema | `access_scope` y `credential` obligatorios y **completados por un humano**; el crawler nunca habilita        |
 | **Credenciales de la API v2**                | El alcance depende de la credencial. Para un agente interno que mira varias empresas hace falta una credencial nueva de soporte, que es poderosa                 | Credencial dedicada de solo lectura, grupos acotados (`eng-oncall`), auditoría                               |
 | **Contratos que cambian**                    | La API v2 está versionada (bien), pero las `/api/*` internas son view models sin versionar                                                                       | Que el crawler detecte cambios de schema y abra un PR; para `/api/*`, solo tools escritas a mano (como en B) |
 | **Descripciones del LLM incorrectas**        | Un docstring ambiguo puede dar una descripción "convincente" pero equivocada (el problema `getX`/`getY` de la sección 0.6)                                       | Revisión del dueño en el PR; el diff queda versionado y se puede revertir                                    |
-| **Retorno menor que en Uber**                | Uber: miles de servicios. Dialpad: ~409 endpoints públicos concentrados en UV                                                                                    | Encenderlo solo sobre `@public_api`, que es donde hay contratos de calidad                                   |
+| **Retorno menor que en Uber**                | Uber: miles de servicios. PhoneCentral: ~409 endpoints públicos concentrados en UV                                                                                    | Encenderlo solo sobre `@public_api`, que es donde hay contratos de calidad                                   |
 
 #### C.8 Qué problemas resuelve C
 
@@ -1639,9 +1639,9 @@ transcripciones completas dentro del contexto.
 2. Sumar **projection** pronto: es barato y no requiere crawler.
 3. Encender el **crawler** solo sobre `@public_api`, y solo cuando haya demanda real de "exponer X endpoint".
 
-Los principios de `dialpad-user-mcp` (sin credenciales propias cuando importa quién pregunta, registry auditado,
+Los principios de `phonecentral-user-mcp` (sin credenciales propias cuando importa quién pregunta, registry auditado,
 sin parámetro `user_id` que el modelo pueda inventar) deberían ser la base del gateway, aunque el gateway apunte
-a **agentes internos** y `dialpad-user-mcp` a **agentes de producto**.
+a **agentes internos** y `phonecentral-user-mcp` a **agentes de producto**.
 
 ---
 
@@ -1669,8 +1669,8 @@ probarlo en chico antes de comprometerse.
 | **Punto único de falla**               | Si el gateway se cae, se caen todos los agentes de la empresa a la vez                                                                    | Cloud Run con varias instancias mínimas, SLO propio, y un "modo degradado" documentado (volver temporalmente a los CLIs)        |
 | **Latencia extra**                     | Cada llamada suma un salto de red y los chequeos                                                                                          | Mantener el data plane chico, como `egress-proxy`: pocas dependencias, nada sincrónico innecesario                              |
 | **El vault como blanco**               | Guarda tokens de Atlassian/GitHub de **todos** los devs. Comprometer el gateway compromete a todos                                        | Cifrado con KMS, scopes OAuth mínimos, tokens de vida corta con refresh, acceso al vault solo desde el data plane               |
-| **Credenciales de servicio poderosas** | `support_readonly` puede leer datos de cualquier empresa. Un bug en la authZ del gateway la expone a cualquiera                           | Solo lectura, grupos acotados, tests que fijen las invariantes de authZ (como hace `dialpad-user-mcp`), alertas por uso anómalo |
-| ***Confused deputy***                  | El gateway tiene más permisos que quien le pide algo; si la authZ falla, actúa "en nombre de" alguien que no debería poder                | Ninguna tool acepta un `user_id` como parámetro: la identidad viene solo del token (principio de `dialpad-user-mcp`)            |
+| **Credenciales de servicio poderosas** | `support_readonly` puede leer datos de cualquier empresa. Un bug en la authZ del gateway la expone a cualquiera                           | Solo lectura, grupos acotados, tests que fijen las invariantes de authZ (como hace `phonecentral-user-mcp`), alertas por uso anómalo |
+| ***Confused deputy***                  | El gateway tiene más permisos que quien le pide algo; si la authZ falla, actúa "en nombre de" alguien que no debería poder                | Ninguna tool acepta un `user_id` como parámetro: la identidad viene solo del token (principio de `phonecentral-user-mcp`)            |
 | **Cuello de botella organizacional**   | Toda tool nueva pasa por un PR al registry; si el equipo dueño del gateway tarda, los equipos vuelven a armar integraciones por su cuenta | El registry lo aprueba **el equipo dueño de la tool** (CODEOWNERS por archivo), no el equipo del gateway                        |
 | **Debugging más difícil**              | Un error puede estar en el agente, el gateway o el sistema de fondo                                                                       | Un request id que viaje de punta a punta y quede en el audit log                                                                |
 | **Desfase con los servers externos**   | Si Atlassian agrega o cambia tools, el registry no se entera solo                                                                         | El catálogo marca las tools nuevas como "disponibles pero no habilitadas" y avisa al dueño                                      |
@@ -1708,7 +1708,7 @@ Cada fase deja algo útil por sí sola. Si el piloto no convence, lo aprendido i
   REST de Jira?
 - **¿Qué credencial usa el gateway para datos de UV?** ¿Existe algo equivalente a los permisos de CSR que se
   pueda acotar a solo lectura?
-- **¿Qué relación tiene con `dialpad-user-mcp`?** ¿Lo absorbe, lo pone detrás como un server más, o quedan
+- **¿Qué relación tiene con `phonecentral-user-mcp`?** ¿Lo absorbe, lo pone detrás como un server más, o quedan
   separados (agentes internos vs. agentes de producto)?
 - **¿Glean entra detrás del gateway** como un server más, o sigue conectado directo?
 - **¿Qué datos pueden salir hacia un LLM?** Hace falta una política por clasificación de datos que el gateway

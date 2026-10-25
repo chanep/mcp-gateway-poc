@@ -1,6 +1,6 @@
 # MCP Gateway Local con LangGraph (PoC Educativo)
 
-Este proyecto es una Prueba de Concepto (PoC) que implementa la arquitectura de un **MCP Gateway empresarial** (inspirado en el [MCP Gateway de Uber](https://www.uber.com/us/en/blog/designing-mcp-gateway/) y la **Alternativa B** analizada para Dialpad), consumido por un agente inteligente construido con **LangGraph oficial** (`create_react_agent` + `MultiServerMCPClient`).
+Este proyecto es una Prueba de Concepto (PoC) que implementa la arquitectura de un **MCP Gateway empresarial** (inspirado en el [MCP Gateway de Uber](https://www.uber.com/us/en/blog/designing-mcp-gateway/) y la **Alternativa B** analizada para PhoneCentral), consumido por un agente inteligente construido con **LangGraph oficial** (`create_react_agent` + `MultiServerMCPClient`).
 
 ---
 
@@ -104,4 +104,4 @@ GEMINI_MODEL="gemini-3.5-flash-lite"
 
 ## 📂 Documentación Adicional
 
-- [PLAN.md](PLAN.md): Plan de proyecto detallado con el diseño conceptual, analogía y equivalencias de Uber/Dialpad.
+- [PLAN.md](PLAN.md): Plan de proyecto detallado con el diseño conceptual, analogía y equivalencias de Uber/PhoneCentral.
