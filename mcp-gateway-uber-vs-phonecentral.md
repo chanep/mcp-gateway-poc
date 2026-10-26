@@ -3,6 +3,9 @@
 Análisis del artículo [Designing Uber's MCP Gateway](https://www.uber.com/us/en/blog/designing-mcp-gateway/)
 y de qué significaría una arquitectura parecida en PhoneCentral.
 
+> [!NOTE]
+> **Nota de contexto**: *PhoneCentral* es una empresa ficticia de telefonía en la nube y comunicaciones corporativas (inspirada en arquitecturas reales de plataformas SaaS de comunicaciones como Dialpad). Se utiliza a lo largo de este documento y en el código del repositorio como caso de estudio técnico y entorno de prueba arquitectónico para sanitizar y anonimizar datos, herramientas propietarias y nombres internos de repositorios.
+
 **Índice**
 
 - [El artículo en una línea](#el-artículo-en-una-línea)
@@ -31,11 +34,11 @@ quiere decir "algo remoto", y **"client"** no es la persona ni el modelo.
 
 ### 0.1 Los 4 conceptos
 
-| Concepto      | Qué es                                                            | En Claude Code en firespotter                       |
+| Concepto      | Qué es                                                            | En Claude Code en phonecentral-core                 |
 | ------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
 | **Host**      | La app donde vive el agente                                       | Claude Code (la extensión de VSCode o la CLI)       |
 | **Client**    | El conector dentro del host. Hay **uno por cada server**          | Claude Code abre uno por cada server configurado    |
-| **Server**    | El programa que dice "tengo estas tools" y las ejecuta            | Atlassian, PagerDuty, Dialtone, client-tools, Glean |
+| **Server**    | El programa que dice "tengo estas tools" y las ejecuta            | Atlassian, PagerDuty, Pulse UI, client-tools, Glean |
 | **Transport** | Cómo viajan los mensajes (siempre JSON-RPC) entre client y server | `stdio` o `HTTP`                                    |
 
 El **modelo** (Claude) no habla MCP. Solo dice "quiero llamar a la tool `getJiraIssue` con estos
@@ -60,7 +63,7 @@ conoce el sistema de fondo.
   también la del usuario (`~/.claude.json`); el Glean MCP, por ejemplo, va en la de usuario.
 - Lo que cambia por instancia es sobre todo **el transporte y la auth**:
 
-| Qué cambia   | stdio (Dialtone, client-tools, puente de PagerDuty) | HTTP (Atlassian, Glean)           |
+| Qué cambia   | stdio (Pulse UI, client-tools, puente de PagerDuty) | HTTP (Atlassian, Glean)           |
 | ------------ | --------------------------------------------------- | --------------------------------- |
 | Cómo conecta | Lanza un proceso hijo (`npx ...`)                   | Hace requests HTTPS a una URL     |
 | Config       | `command`, `args`, `env`                            | `url`, `headers`                  |
@@ -80,16 +83,16 @@ Claude: "llamo mcp__atlassian__getJiraIssue"
          └─► instancia del client #1 (HTTP) ─► mcp.atlassian.com
 ```
 
-### 0.3 Los servers MCP configurados en firespotter
+### 0.3 Los servers MCP configurados en el workspace
 
 Los de [.mcp.json](../.mcp.json):
 
-| Server           | Transport                    | Dónde corre                                       | Quién lo implementa                | Auth                |
-| ---------------- | ---------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------- |
-| **atlassian**    | HTTP                         | Nube de Atlassian (`mcp.atlassian.com`)           | Atlassian                          | OAuth en el browser |
-| **pagerduty**    | stdio → HTTP (con un puente) | Puente local + server real en `mcp.pagerduty.com` | PagerDuty (el puente: open source) | `PAGERDUTY_TOKEN`   |
-| **dialtone**     | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (equipo de Dialtone)       | Ninguna             |
-| **client-tools** | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (goblin-client-tools)      | Token de GitHub     |
+| Server           | Transport                    | Dónde corre                                       | Quién lo implementa                     | Auth                |
+| ---------------- | ---------------------------- | ------------------------------------------------- | --------------------------------------- | ------------------- |
+| **atlassian**    | HTTP                         | Nube de Atlassian (`mcp.atlassian.com`)           | Atlassian                               | OAuth en el browser |
+| **pagerduty**    | stdio → HTTP (con un puente) | Puente local + server real en `mcp.pagerduty.com` | PagerDuty (el puente: open source)      | `PAGERDUTY_TOKEN`   |
+| **pulse-ui**     | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (Design System)            | Ninguna             |
+| **client-tools** | stdio                        | Tu laptop (proceso `node`)                        | PhoneCentral (web-client-tools)         | Token de GitHub     |
 
 **Atlassian: el server remoto "puro".** Claude Code no ejecuta nada local. Abre una conexión HTTP a
 `mcp.atlassian.com`; la primera vez te logueás por OAuth, y desde ahí cada `getJiraIssue` es un request
@@ -104,12 +107,12 @@ Claude Code ──stdio──► mcp-remote (en la laptop) ──HTTP + token─
 `mcp-remote` es un adaptador: Claude Code cree que habla con un server local por stdio, y el puente reenvía
 todo por HTTP, inyectando tu token en el header.
 
-**Dialtone: server 100% local.** `npx @phonecentral/dialtone-mcp-server` descarga un paquete npm de PhoneCentral y lo
-corre en la laptop. Los datos de componentes, tokens e íconos vienen **empaquetados dentro del paquete**,
+**Pulse UI: server 100% local.** `npx @phonecentral/pulse-ui-mcp` descarga el paquete del Design System de PhoneCentral y lo
+corre en la laptop. Los datos de componentes Vue/CSS, design tokens e íconos vienen **empaquetados dentro del paquete**,
 así que no llama a nada externo.
 
-**client-tools: local, pero sale a internet por dentro.** También corre en la laptop vía `npx`, pero sus
-tools leen código del repo `phonecentral/goblin-client-tools` **usando la API de GitHub** con tu token. Hacia
+**client-tools (web-client-tools): local, pero sale a internet por dentro.** También corre en la laptop vía `npx`, pero sus
+tools inspeccionan el repositorio del cliente web/desktop (`phonecentral/web-client-tools`) **usando la API de GitHub** con tu token para consultar componentes de frontend, dependencias de paquetes y rutas de la app web. Hacia
 Claude Code habla MCP por stdio; hacia GitHub habla REST normal, sin MCP.
 
 ```
@@ -120,7 +123,7 @@ Claude Code habla MCP por stdio; hacia GitHub habla REST normal, sin MCP.
  │                                            │                  │
  │  client 1 ─────────────────── HTTP ────────┼──────────────────┼─► Atlassian MCP server
  │  client 2 ── stdio ─► [mcp-remote] ─ HTTP ─┼──────────────────┼─► PagerDuty MCP server
- │  client 3 ── stdio ─► [dialtone server]    │                  │
+ │  client 3 ── stdio ─► [pulse-ui server]    │                  │
  │  client 4 ── stdio ─► [client-tools srv] ──┼── REST ──────────┼─► GitHub API
  └────────────────────────────────────────────┘                  │
 ```
@@ -388,16 +391,16 @@ el modelo son tools distintas con caminos distintos. Esa duplicación es uno de 
 
 ## 1) Un flow agéntico en PhoneCentral, contado como historia
 
-**Lunes, 10:00.** A Juan, ingeniero de UV, le asignan el ticket **DP-200001** (ficticio): *"Algunos usuarios
+**Lunes, 10:00.** A Juan, ingeniero de UV, le asignan el ticket **PC-200001** (ficticio): *"Algunos usuarios
 reciben un error 500 al mandar un SMS desde la app"*.
 
 Antes de los agentes, Juan habría hecho todo a mano: abrir Jira, leer el ticket, buscar en Confluence, entrar
 a Observe para ver logs, abrir Sentry para ver el stack trace, buscar en el código, arreglar, correr tests,
 abrir el PR y volver a Jira para comentar. Son unas 8 pestañas y 8 logins.
 
-**Ahora abre Claude Code en `firespotter` y escribe:**
+**Ahora abre Claude Code en `phonecentral-core` y escribe:**
 
-> "Investigá y resolvé DP-200001"
+> "Investigá y resolvé PC-200001"
 
 Esto es lo que pasa, visto desde afuera:
 
@@ -409,7 +412,7 @@ Esto es lo que pasa, visto desde afuera:
 | 4    | Trae el stack trace exacto                          | `sentry` CLI (skill)            |
 | 5    | Revisa si hubo incidente o alerta relacionada       | PagerDuty MCP                   |
 | 6    | Lee la entidad del usuario en Datastore             | skill `datastore-lookup` (REST) |
-| 7    | Encuentra la línea culpable en `ubervoice/`         | lectura local del repo          |
+| 7    | Encuentra la línea culpable en `phonevoice/`        | lectura local del repo          |
 | 8    | Escribe el fix y el test, y corre tox               | shell local                     |
 | 9    | Abre el PR                                          | `gh` CLI                        |
 | 10   | Comenta en el ticket con el link al PR              | `jira` CLI                      |
@@ -421,7 +424,7 @@ Esto es lo que pasa, visto desde afuera:
 En una sola tarea el agente tocó **unos 7 sistemas distintos**, y **cada uno se conecta de una forma
 diferente**:
 
-- Unos son **servers MCP** declarados en [.mcp.json](../.mcp.json): Atlassian, PagerDuty, Dialtone y
+- Unos son **servers MCP** declarados en [.mcp.json](../.mcp.json): Atlassian, PagerDuty, Pulse UI y
   client-tools.
 - Otros son **CLIs** que Juan tiene instalados y autenticados en su laptop: `jira`, `gh`, `observe`,
   `sentry`, `pup`.
@@ -447,12 +450,12 @@ cada uno de los 10 pasos**.
 | ---------- | ------------------------------------------------------- | -------------------------------------- |
 | Jira       | `jira` CLI + Atlassian MCP en [.mcp.json](../.mcp.json) | API token de Jira + OAuth de Atlassian |
 | Confluence | (el mismo Atlassian MCP)                                | OAuth de Atlassian                     |
-| Observe    | CLI de Observe (vía plugin `phonecentral`)                   | Token de Observe                       |
+| Observe    | CLI de Observe (vía plugin `phonecentral`)              | Token de Observe                       |
 | Sentry     | CLI propio del repo (`tools/sentry_cli/`)               | `SENTRY_AUTH_TOKEN`                    |
 | PagerDuty  | `mcp-remote` vía `npx`                                  | `PAGERDUTY_TOKEN` en el entorno        |
 | Datastore  | `gcloud`                                                | Su login de Google (`gcloud auth`)     |
 | GitHub     | `gh` CLI                                                | Token de GitHub                        |
-| Glean      | Glean MCP a nivel usuario                               | SSO de PhoneCentral                         |
+| Glean      | Glean MCP a nivel usuario                               | SSO de PhoneCentral                    |
 
 Son unas **8 credenciales personales**, cada una con su forma de obtenerla, renovarla y guardarla.
 
@@ -462,8 +465,8 @@ Son unas **8 credenciales personales**, cada una con su forma de obtenerla, reno
 | ---- | -------------------- | ---------------------------------------- | ---------------------------------------------------- | ------------------------------------- |
 | 1    | Leer el ticket       | `Bash` → `jira issue view`               | CLI → API REST de Jira                               | Open source (jira-cli)                |
 | 2    | Buscar docs          | `mcp__atlassian__searchConfluence`       | MCP client → HTTP → server de Atlassian → Confluence | Atlassian                             |
-| 3    | Buscar logs          | `Bash` → `observe query ...`             | CLI → API de Observe                                 | PhoneCentral (plugin)                      |
-| 4    | Stack trace          | `Bash` → `uv run ... sentry issue stack` | CLI del repo → API web de Sentry                     | PhoneCentral (`tools/sentry_cli`)          |
+| 3    | Buscar logs          | `Bash` → `observe query ...`             | CLI → API de Observe                                 | PhoneCentral (plugin)                 |
+| 4    | Stack trace          | `Bash` → `uv run ... sentry issue stack` | CLI del repo → API web de Sentry                     | PhoneCentral (`tools/sentry_cli`)     |
 | 5    | Incidentes           | `mcp__pagerduty__...`                    | MCP client → stdio → `mcp-remote` → HTTP → PagerDuty | PagerDuty + puente open source        |
 | 6    | Entidad en Datastore | `Bash` → `curl` con token de `gcloud`    | curl → API REST de Google Datastore                  | Nadie: la skill trae el curl "a mano" |
 | 7-8  | Código, fix y tests  | `Read`, `Grep`, `Edit`, `Bash`           | Local                                                | Anthropic (built-ins)                 |
@@ -501,7 +504,7 @@ comando correr.
  │      ├─ atlassian (HTTP) ──────────── OAuth ──────────────────┼──► Atlassian MCP ─► Confluence/Jira
  │      ├─ pagerduty (stdio→mcp-remote) ─ PAGERDUTY_TOKEN ───────┼──► PagerDuty MCP
  │      ├─ glean (HTTP) ──────────────── SSO ────────────────────┼──► Glean MCP
- │      └─ dialtone / client-tools (stdio, locales)              │
+ │      └─ pulse-ui / client-tools (stdio, locales)              │
  └───────────────────────────────────────────────────────────────┘
           ▲
           └── el modelo en la nube de Anthropic decide qué usar y recibe todos los resultados
@@ -532,7 +535,7 @@ aparecer estos problemas.
 
 ### Problema 1: Cada laptop es una isla (setup frágil y duplicado)
 
-**Escena:** entra Ana al equipo. Le pasan el link a `/setup-firespotter`. Tarda una tarde: instalar 5 CLIs,
+**Escena:** entra Ana al equipo. Le pasan el link a `/setup-phonecentral`. Tarda una tarde: instalar 5 CLIs,
 sacar 8 tokens, entender que el de PagerDuty va en una variable de entorno y el de Sentry en `config init`. Al
 día siguiente el de PagerDuty falla con *"Connection closed"* y nadie sabe si es su token, el puente
 `mcp-remote` o PagerDuty.
@@ -655,7 +658,7 @@ alguien escribe una skill nueva con un truco nuevo: curl, scraping o un CLI case
 ### Problema 7: Descubrimiento y contexto
 
 **Escena 1 (descubrimiento):** Pedro, de otro equipo, quiere que su agente lea call legs de FST. No sabe que
-existe `fst-artifacts`, porque vive en `.claude/skills/` de firespotter. Lo reescribe.
+existe `fst-artifacts`, porque vive en `.claude/skills/` de phonecentral-core. Lo reescribe.
 
 **Escena 2 (contexto):** si se conectan muchos más servers MCP, el modelo arranca cada sesión con cientos de
 nombres de tools. Cada `tool_result` grande (50 comentarios de un ticket, 500 líneas de logs) se come el
@@ -690,7 +693,7 @@ Hay piezas en el repo que cambian bastante el diseño:
 | Pieza existente        | Dónde                                                                        | Por qué importa                                                                                                                                                                                                                                                                                                  |
 | ---------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`phonecentral-user-mcp`** | [dp-ai-agents/phonecentral_user_mcp/](../dp-ai-agents/phonecentral_user_mcp/README.md) | Un server MCP interno en Cloud Run para los agentes **de producto** (usuarios finales). Ya aplica varios principios de Uber: no tiene credenciales propias (reenvía el token del usuario), tiene un **registry auditado** de endpoints permitidos, es solo lectura y "da forma" a las respuestas (`shaping.py`). |
-| **`@public_api`**      | [ubervoice/frontend/apis/endpoints/](../ubervoice/frontend/apis/endpoints/)  | ~409 endpoints de la API pública v2, con params y respuesta tipados (pydantic), docstring y nombre estable. Ya generan OpenAPI para la doc pública (`ApiDocSet`). Es lo más parecido que tiene PhoneCentral al **IDL** de Uber.                                                                                       |
+| **`@public_api`**      | [phonevoice/frontend/apis/endpoints/](../phonevoice/frontend/apis/endpoints/)  | ~409 endpoints de la API pública v2, con params y respuesta tipados (pydantic), docstring y nombre estable. Ya generan OpenAPI para la doc pública (`ApiDocSet`). Es lo más parecido que tiene PhoneCentral al **IDL** de Uber.                                                                                       |
 | **`@openapi_schema`**  | [common/lib/openapi/wrappers.py](../common/lib/openapi/wrappers.py)          | Schemas marshmallow en handlers internos. Solo ~37 usos en UV, en su mayoría de login/OAuth.                                                                                                                                                                                                                     |
 | **`egress-proxy`**     | [egress-proxy/](../egress-proxy/README.md)                                   | Un relay en Cloud Run con allowlist de destinos. Precedente de "servicio intermedio chico, con allowlist estricta y o11y propia".                                                                                                                                                                                |
 
@@ -707,7 +710,7 @@ acceso, pero es de alcance company-wide y permite el acceso por defecto si la gr
 asociada. Exponer endpoints automáticamente, sin leer el handler, sería peligroso.
 
 Otro detalle: el docstring de `call.list`
-([call.py:852-862](../ubervoice/frontend/apis/endpoints/call.py#L852-L862)) dice que las API keys de empresa y
+([call.py:852-862](../phonevoice/frontend/apis/endpoints/call.py#L852-L862)) dice que las API keys de empresa y
 los admins ven todas las llamadas de la empresa, y que **las API keys de usuario ven solo las propias**. La
 API v2 **ya cambia el alcance según la credencial**, así que elegir con qué credencial llama el gateway es una
 decisión de seguridad.
@@ -1111,7 +1114,7 @@ En PhoneCentral no hay IDL central, pero hay **tres fuentes** con algo parecido:
 Los endpoints internos `/api/*` sin schema **no son una fuente**: no hay nada legible por máquina para leer.
 
 Así se ve un endpoint `@public_api`
-([call.py:816-831](../ubervoice/frontend/apis/endpoints/call.py#L816-L831)), la materia prima ideal:
+([call.py:816-831](../phonevoice/frontend/apis/endpoints/call.py#L816-L831)), la materia prima ideal:
 
 ```python
 @public_api('GET', 'call/{id}', name='call.get_call_info', ...)
